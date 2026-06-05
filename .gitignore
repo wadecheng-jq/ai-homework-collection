@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.log
+static/uploads/*
+!static/uploads/.gitkeep
+submissions.xlsx
+*.db
+*.sqlite
+.DS_Store
+*.bak
+*.tmp

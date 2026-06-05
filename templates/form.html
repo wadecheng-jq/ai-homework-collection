@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI作业提交系统</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: '微软雅黑', 'Microsoft YaHei', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            width: 100%;
+            max-width: 640px;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #1F4E79, #2E7D32);
+            color: white;
+            padding: 28px 32px 24px;
+            position: relative;
+        }
+        .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+        .header p { font-size: 13px; opacity: 0.85; }
+        .deadline-badge {
+            position: absolute;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.18);
+            border-radius: 10px;
+            padding: 10px 16px;
+            text-align: center;
+            backdrop-filter: blur(4px);
+        }
+        .deadline-badge .label { font-size: 11px; opacity: 0.8; }
+        .deadline-badge .time { font-size: 15px; font-weight: 700; margin-top: 2px; }
+
+        .count-bar {
+            background: #F1F8E9;
+            border-bottom: 1px solid #C8E6C9;
+            padding: 10px 32px;
+            font-size: 13px;
+            color: #2E7D32;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .count-bar .num { font-weight: 700; font-size: 16px; }
+
+        .form-body { padding: 28px 32px 32px; }
+
+        .locked-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.92);
+            z-index: 10;
+            border-radius: 0 0 16px 16px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+        }
+        .locked-overlay.show { display: flex; }
+        .locked-icon { font-size: 48px; margin-bottom: 16px; }
+        .locked-title { font-size: 20px; font-weight: 700; color: #C62828; margin-bottom: 8px; }
+        .locked-desc { font-size: 14px; color: #666; line-height: 1.6; }
+
+        .form-wrap { position: relative; }
+        .form-inner { transition: opacity 0.3s; }
+        .form-inner.locked { opacity: 0.35; pointer-events: none; }
+
+        .field { margin-bottom: 20px; }
+        .field label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .field label .req { color: #E53935; margin-left: 2px; }
+        .field label .opt { color: #999; font-weight: 400; font-size: 12px; margin-left: 4px; }
+        .field .hint { font-size: 12px; color: #999; margin-bottom: 6px; }
+
+        input[type="text"], input[type="file"], textarea, select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #C8E6C9;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+            background: #FAFAFA;
+        }
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #2E7D32;
+            background: #fff;
+        }
+        textarea { min-height: 140px; resize: vertical; }
+
+        .file-area {
+            border: 2px dashed #A5D6A7;
+            border-radius: 10px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            background: #F9FBE7;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .file-area:hover { background: #F0F4C3; border-color: #66BB6A; }
+        .file-area.dragover { background: #DCEDC8; border-color: #388E3C; }
+        .file-icon { font-size: 32px; margin-bottom: 8px; }
+        .file-text { font-size: 13px; color: #666; }
+        .file-name { font-size: 13px; color: #2E7D32; font-weight: 600; margin-top: 8px; }
+        input[type="file"] { display: none; }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2E7D32, #388E3C);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+        .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(46,125,50,0.35); }
+        .btn-submit:active { transform: translateY(0); }
+        .btn-submit:disabled { background: #CCC; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .toast {
+            position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+            padding: 14px 28px; border-radius: 10px;
+            font-size: 14px; font-weight: 600;
+            z-index: 9999;
+            opacity: 0; transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; pointer-events: auto; }
+        .toast.success { background: #2E7D32; color: white; }
+        .toast.error { background: #C62828; color: white; }
+
+        @media (max-width: 480px) {
+            .header { padding: 20px 20px 16px; }
+            .header h1 { font-size: 18px; }
+            .deadline-badge { position: static; margin-top: 12px; transform: none; }
+            .form-body { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="container">
+    <div class="header">
+        <h1>🤖 AI作业提交</h1>
+        <p>请填写以下信息完成提交，带 * 为必填项</p>
+        <div class="deadline-badge">
+            <div class="label">⏰ 截止时间</div>
+            <div class="time" id="deadlineText">{{ deadline_str }}</div>
+        </div>
+    </div>
+
+    <div class="count-bar">
+        ✅ 当前已收到 <span class="num" id="countNum">{{ submission_count }}</span> 份提交
+    </div>
+
+    <div class="form-body">
+        <div class="form-wrap">
+            <div class="form-inner {% if deadline_passed %}locked{% endif %}" id="formInner">
+                <form id="mainForm" enctype="multipart/form-data">
+
+                    <div class="field">
+                        <label>姓名 <span class="req">*</span></label>
+                        <div class="hint">请填写与花名册一致的姓名，重复提交将被拒绝</div>
+                        <input type="text" name="name" id="inpName" placeholder="请输入姓名" required>
+                    </div>
+
+                    <div class="field">
+                        <label>圈子/部门 <span class="req">*</span></label>
+                        <input type="text" name="group" id="inpGroup" placeholder="请输入所属圈子或部门" required>
+                    </div>
+
+                    <div class="field">
+                        <label>作业文字内容 <span class="req">*</span></label>
+                        <div class="hint">请在此填写大模型解决岗位零缺陷执行落地问题的方案内容</div>
+                        <textarea name="content" id="inpContent" placeholder="请详细描述你的AI作业内容..." required></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>你使用的AI工具和大模型 <span class="req">*</span></label>
+                        <div class="hint">请填写你使用的AI工具名称及大模型（如：ChatGPT-4o、文心一言4.0、通义千问、DeepSeek等）</div>
+                        <input type="text" name="ai_tool" id="inpAiTool" placeholder="例：ChatGPT-4o / 文心一言4.0 / DeepSeek" required>
+                    </div>
+
+                    <div class="field">
+                        <label>作业附件上传 <span class="opt">(选填)</span></label>
+                        <div class="hint">支持图片、Office文档、PDF、压缩包等，单个文件最大50MB</div>
+                        <div class="file-area" id="fileArea">
+                            <div class="file-icon">📎</div>
+                            <div class="file-text">点击选择文件，或拖拽文件到此处</div>
+                            <div class="file-name" id="fileName"></div>
+                        </div>
+                        <input type="file" name="file" id="inpFile">
+                    </div>
+
+                    <button type="submit" class="btn-submit" id="btnSubmit">
+                        🚀 提交作业
+                    </button>
+                </form>
+            </div>
+
+            {% if deadline_passed %}
+            <div class="locked-overlay show" id="lockedOverlay">
+                <div class="locked-icon">🔒</div>
+                <div class="locked-title">提交已截止</div>
+                <div class="locked-desc">
+                    截止时间：{{ deadline_str }}<br>
+                    如有特殊情况，请联系管理员处理。
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // ============ 截止时间锁定 ============
+    const deadlineStr = "{{ deadline_str }}";
+    // 解析截止时间（格式：YYYY年MM月DD日 HH:MM）
+    function parseDeadline(str) {
+        const m = str.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{1,2})/);
+        if (m) return new Date(m[1], m[2]-1, m[3], m[4], m[5], 0);
+        return null;
+    }
+    const deadline = parseDeadline(deadlineStr);
+    const now = new Date();
+
+    // 前端二次校验（后端也会校验）
+    if (deadline && now > deadline) {
+        document.getElementById("formInner").classList.add("locked");
+        document.getElementById("lockedOverlay").classList.add("show");
+    }
+
+    // ============ 倒计时显示 ============
+    function updateCountdown() {
+        if (!deadline) return;
+        const now = new Date();
+        const diff = deadline - now;
+        if (diff <= 0) {
+            document.getElementById("deadlineText").textContent = "已截止";
+            return;
+        }
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        let s = "";
+        if (d > 0) s += `${d}天`;
+        s += `${h}时${m}分`;
+        document.getElementById("deadlineText").textContent = s + "截止";
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 60000);
+
+    // ============ 文件拖拽上传 ============
+    const fileArea = document.getElementById("fileArea");
+    const inpFile = document.getElementById("inpFile");
+    const fileName = document.getElementById("fileName");
+
+    fileArea.addEventListener("click", () => inpFile.click());
+    inpFile.addEventListener("change", () => {
+        if (inpFile.files.length > 0) {
+            fileName.textContent = "已选择：" + inpFile.files[0].name;
+        }
+    });
+    fileArea.addEventListener("dragover", e => { e.preventDefault(); fileArea.classList.add("dragover"); });
+    fileArea.addEventListener("dragleave", () => fileArea.classList.remove("dragover"));
+    fileArea.addEventListener("drop", e => {
+        e.preventDefault();
+        fileArea.classList.remove("dragover");
+        if (e.dataTransfer.files.length > 0) {
+            inpFile.files = e.dataTransfer.files;
+            fileName.textContent = "已选择：" + e.dataTransfer.files[0].name;
+        }
+    });
+
+    // ============ Toast 提示 ============
+    function showToast(msg, type = "success") {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = "toast " + type + " show";
+        setTimeout(() => t.classList.remove("show"), 3500);
+    }
+
+    // ============ 表单提交 ============
+    document.getElementById("mainForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById("inpName").value.trim();
+        const group = document.getElementById("inpGroup").value.trim();
+        const content = document.getElementById("inpContent").value.trim();
+        const aiTool = document.getElementById("inpAiTool").value.trim();
+        const file = document.getElementById("inpFile").files[0];
+
+        if (!name) { showToast("请输入姓名！", "error"); return; }
+        if (!group) { showToast("请输入圈子/部门！", "error"); return; }
+        if (!content) { showToast("请输入作业文字内容！", "error"); return; }
+        if (!aiTool) { showToast("请填写你使用的AI工具和大模型！", "error"); return; }
+
+        const btn = document.getElementById("btnSubmit");
+        btn.disabled = true;
+        btn.textContent = "提交中...";
+
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("group", group);
+        formData.append("content", content);
+        formData.append("ai_tool", aiTool);
+        if (file) {
+            formData.append("file", file);
+        }
+
+        try {
+            const resp = await fetch("/submit", { method: "POST", body: formData });
+            const data = await resp.json();
+
+            if (data.success) {
+                showToast(data.message, "success");
+                document.getElementById("mainForm").reset();
+                document.getElementById("fileName").textContent = "";
+                // 更新计数
+                const cnt = document.getElementById("countNum");
+                cnt.textContent = parseInt(cnt.textContent) + 1;
+            } else {
+                showToast(data.message, "error");
+            }
+        } catch (err) {
+            showToast("网络错误，请稍后重试：" + err.message, "error");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "🚀 提交作业";
+        }
+    });
+</script>
+
+</body>
+</html>

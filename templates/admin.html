@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI作业管理后台</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: '微软雅黑', 'Microsoft YaHei', sans-serif;
+            background: #F5F7FA;
+            color: #333;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #1F4E79, #2E7D32);
+            color: white;
+            padding: 20px 28px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 20px; }
+        .header .meta { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+        .header-btns { display: flex; gap: 10px; }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-white { background: white; color: #1F4E79; }
+        .btn-white:hover { background: #F0F0F0; }
+        .btn-green { background: #C8E6C9; color: #2E7D32; }
+        .btn-green:hover { background: #A5D6A7; }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-width: 140px;
+        }
+        .stat-card .label { font-size: 12px; color: #999; }
+        .stat-card .value { font-size: 28px; font-weight: 700; color: #1F4E79; margin-top: 4px; }
+        .stat-card .value.green { color: #2E7D32; }
+        .stat-card .value.red { color: #C62828; }
+
+        .toolbar {
+            background: white;
+            border-radius: 10px 10px 0 0;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #EEE;
+        }
+        .toolbar h2 { font-size: 15px; color: #333; }
+        .search-box {
+            padding: 6px 12px;
+            border: 1.5px solid #CCC;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 220px;
+            font-family: inherit;
+        }
+        .search-box:focus { outline: none; border-color: #2E7D32; }
+
+        .table-wrap {
+            background: white;
+            border-radius: 0 0 10px 10px;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th {
+            background: #F0F4F8;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #DDD;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #F0F0F0;
+            vertical-align: top;
+            max-width: 300px;
+            word-break: break-all;
+        }
+        tr:hover { background: #F9FBE7; }
+        tr:nth-child(even) { background: #FAFAFA; }
+        tr:nth-child(even):hover { background: #F9FBE7; }
+        .content-cell {
+            max-width: 300px;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .content-cell.expanded {
+            max-height: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .expand-btn { color: #2E7D32; cursor: pointer; font-size: 12px; margin-top: 4px; }
+        .file-link { color: #1F4E79; text-decoration: none; }
+        .file-link:hover { text-decoration: underline; }
+        .badge-ok { background: #E8F5E9; color: #2E7D32; padding: 3px 10px; border-radius: 12px; font-size: 12px; }
+        .no-data { text-align: center; padding: 40px; color: #999; }
+
+        .deadline-warn {
+            background: #FFF3E0;
+            border-left: 4px solid #FF9800;
+            padding: 10px 16px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #E65100;
+            margin-bottom: 20px;
+        }
+        .deadline-warn.over {
+            background: #FFEBEE;
+            border-left-color: #E53935;
+            color: #C62828;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>🤖 AI作业管理后台</h1>
+        <div class="meta">截止时间：{{ deadline_str }} | 服务器时间：<span id="svrTime"></span></div>
+    </div>
+    <div class="header-btns">
+        <a href="/" class="btn btn-white">📝 返回提交页</a>
+        <a href="/admin/download" class="btn btn-green">📥 下载Excel</a>
+    </div>
+</div>
+
+{% if not deadline_passed %}
+<div class="deadline-warn">
+    ⏰ 距离截止时间还有 <span id="cd"></span>
+</div>
+{% else %}
+<div class="deadline-warn over">
+    🔒 提交已截止（{{ deadline_str }}），共收到 {{ submission_count }} 份提交。
+</div>
+{% endif %}
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="label">已提交人数</div>
+        <div class="value green">{{ submission_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">提交状态</div>
+        <div class="value" style="font-size:18px; color: {% if deadline_passed %}#C62828{% else %}#2E7D32{% endif %};">
+            {% if deadline_passed %}已截止{% else %}进行中{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="toolbar">
+    <h2>📋 提交记录列表</h2>
+    <input type="text" class="search-box" id="searchBox" placeholder="搜索姓名、部门、内容...">
+</div>
+
+<div class="table-wrap">
+    {% if records %}
+    <table id="recordTable">
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>提交时间</th>
+                <th>姓名</th>
+                <th>圈子/部门</th>
+                <th>AI工具/大模型</th>
+                <th>作业内容摘要</th>
+                <th>附件</th>
+                <th>状态</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>{{ r.seq }}</td>
+                <td>{{ r.time }}</td>
+                <td><strong>{{ r.name }}</strong></td>
+                <td>{{ r.group }}</td>
+                <td>{{ r.ai_tool }}</td>
+                <td>
+                    <div class="content-cell" id="content-{{ r.seq }}">{{ r.content[:100] }}</div>
+                    {% if r.content and r.content|length > 100 %}
+                    <div class="expand-btn" onclick="toggleContent({{ r.seq }})">展开全部</div>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if r.filename %}
+                    <a class="file-link" href="/{{ r.filepath }}" target="_blank">{{ r.filename[:20] }}</a>
+                    {% else %}
+                    <span style="color:#CCC">无</span>
+                    {% endif %}
+                </td>
+                <td><span class="badge-ok">{{ r.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="no-data">暂无提交记录</div>
+    {% endif %}
+</div>
+
+<script>
+    // 搜索过滤
+    document.getElementById("searchBox").addEventListener("input", function() {
+        const kw = this.value.toLowerCase();
+        const rows = document.querySelectorAll("#recordTable tbody tr");
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(kw) ? "" : "none";
+        });
+    });
+
+    // 展开/收起内容
+    function toggleContent(seq) {
+        const cell = document.getElementById("content-" + seq);
+        const btn = cell.nextElementSibling;
+        if (cell.classList.contains("expanded")) {
+            cell.classList.remove("expanded");
+            btn.textContent = "展开全部";
+        } else {
+            cell.classList.add("expanded");
+            btn.textContent = "收起";
+        }
+    }
+
+    // 服务器时间
+    function updateServerTime() {
+        const now = new Date();
+        document.getElementById("svrTime").textContent = now.toLocaleString('zh-CN');
+    }
+    updateServerTime();
+    setInterval(updateServerTime, 1000);
+
+    // 倒计时
+    {% if not deadline_passed %}
+    (function() {
+        const deadline = new Date("{{ deadline_str }}".replace("年", "-").replace("月", "-").replace("日", "").replace(/\s+/, "T"));
+        function upd() {
+            const now = new Date();
+            const diff = deadline - now;
+            if (diff <= 0) { location.reload(); return; }
+            const d = Math.floor(diff/86400000);
+            const h = Math.floor((diff%86400000)/3600000);
+            const m = Math.floor((diff%3600000)/60000);
+            const s = Math.floor((diff%60000)/1000);
+            let str = "";
+            if (d > 0) str += d + "天";
+            str += h + "时" + m + "分" + s + "秒";
+            const el = document.getElementById("cd");
+            if (el) el.textContent = str;
+            setTimeout(upd, 1000);
+        }
+        upd();
+    })();
+    {% endif %}
+</script>
+
+</body>
+</html>
