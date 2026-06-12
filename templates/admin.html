@@ -211,7 +211,7 @@
                 </td>
                 <td>
                     {% if r.filename %}
-                    <a class="file-link" href="/{{ r.filepath }}" target="_blank">{{ r.filename[:20] }}</a>
+                    <a class="file-link" href="/uploads/{{ r.filepath.replace('\\', '/').split('/')[-1] }}" target="_blank">{{ r.filename[:20] }}</a>
                     {% else %}
                     <span style="color:#CCC">无</span>
                     {% endif %}
